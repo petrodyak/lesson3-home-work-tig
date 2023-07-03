@@ -1,0 +1,83 @@
+version: '3'
+services:
+  mongodb:
+    image: mongo
+    container_name: "lesson3_hw_mongodb"
+    restart: always
+    ports:
+      - 27017:27017
+    environment:
+      - MONGO_INITDB_ROOT_USERNAME=admin
+      - MONGO_INITDB_ROOT_PASSWORD=admin      
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - mynetwork      
+
+  elasticsearch:
+    container_name: "lesson3_hw_elasticsearch"
+    image: elasticsearch:7.17.10
+    restart: always
+    ports:
+      - '9200:9200'
+      - '9300:9300'
+    environment:
+      - discovery.type=single-node
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --fail localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 10s
+      retries: 3      
+    networks:
+      - mynetwork
+
+  telegraf:
+    image: telegraf:1.18-alpine
+    volumes:
+      - ./telegraf/etc/telegraf.conf:/etc/telegraf/telegraf.conf:ro    
+    depends_on:
+      - influxdb
+    links:
+      - influxdb
+    ports:
+    - '127.0.0.1:8125:8125/udp'      
+    restart: always
+    networks:
+      - mynetwork
+
+  influxdb:
+    image: influxdb:1.8-alpine
+    restart: always
+    ports:
+      - 8086:8086
+    volumes:
+      - ./:/imports
+      - influxdb_data:/var/lib/influxdb
+    networks:
+      - mynetwork
+
+  grafana:
+    image: grafana/grafana:8.0.2
+    restart: always
+    links:
+      - influxdb
+    ports:
+      - '127.0.0.1:3000:3000'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+      - ./grafana/dashboards/:/var/lib/grafana/dashboards/
+    networks:
+      - mynetwork
+
+networks:
+  mynetwork:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  elasticsearch_data:
+  influxdb_data:
+  grafana_data:
